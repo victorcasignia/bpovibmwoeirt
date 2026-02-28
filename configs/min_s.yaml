@@ -1,0 +1,38 @@
+model:
+  name: "min_s"
+  attention_type: "area"
+  num_heads: 8
+  area_size: 2
+  window_size: 4
+  num_kv_heads: 2
+  num_landmarks: 64
+  segment_size: 16
+  topk_landmarks: 4
+  num_classes: 1000
+  in_channels: 3
+  stem_channels: 64
+  depths: [2, 2, 6, 2]
+  dims: [64, 128, 256, 512]
+  infusion_stages: [False, False, True, True]
+  drop_path_rate: 0.1
+
+training:
+  epochs: 5
+  batch_size: 16
+  learning_rate: 0.001
+  weight_decay: 0.05
+  optimizer: "musgd"
+  muon_momentum: 0.95
+  sgd_momentum: 0.9
+  warmup_epochs: 1
+  noise_anneal_epochs: 1
+
+data:
+  dataset: "dummy"
+  data_dir: "./data"
+  image_size: 224
+  num_workers: 2
+
+logging:
+  project: "mamba-infusion-network"
+  run_name: "min-s-smoketest"

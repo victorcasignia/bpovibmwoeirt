@@ -1,0 +1,39 @@
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Environments
+.venv/
+venv/
+env/
+.env
+
+# Project artifacts
+checkpoints/
+runs/
+wandb/
+logs/
+outputs/
+
+# Data artifacts
+data/
+
+# Model / benchmark outputs
+*.pth
+*.pt
+*.ckpt
+*.onnx
+*.npy
+*.npz
+
+# Editor
+.vscode/
+.idea/
