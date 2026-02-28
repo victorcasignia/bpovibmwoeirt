@@ -20,6 +20,9 @@ training:
   epochs: 10
   batch_size: 256
   learning_rate: 0.001
+  scheduler:
+    type: "cosine"
+    min_lr: 1.0e-6
   weight_decay: 0.05
   optimizer: "musgd"
   muon_momentum: 0.95

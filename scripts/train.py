@@ -25,6 +25,7 @@ def get_dummy_dataloader(batch_size, image_size, num_classes, num_samples=100):
 
 def train(config_path):
     config = load_config(config_path)
+    scheduler_cfg = config['training'].get('scheduler', {'type': 'none'})
     
     # Initialize wandb
     wandb.init(project=config['logging']['project'], name=config['logging']['run_name'], config=config)
@@ -71,6 +72,18 @@ def train(config_path):
         )
     else:
         optimizer = torch.optim.AdamW(model.parameters(), lr=config['training']['learning_rate'], weight_decay=config['training']['weight_decay'])
+
+    scheduler_type = scheduler_cfg.get('type', 'none').lower()
+    if scheduler_type == 'cosine':
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=config['training']['epochs'],
+            eta_min=scheduler_cfg.get('min_lr', 1e-6),
+        )
+    elif scheduler_type == 'none':
+        scheduler = None
+    else:
+        raise ValueError(f"Unsupported scheduler type: {scheduler_type}. Use 'none' or 'cosine'.")
         
     criterion = nn.CrossEntropyLoss()
     
@@ -134,6 +147,7 @@ def train(config_path):
     
     print("Starting training loop...")
     for epoch in range(epochs):
+        current_lr = optimizer.param_groups[0]['lr']
         model.train()
         train_loss = 0.0
         correct = 0
@@ -186,16 +200,20 @@ def train(config_path):
                 
         val_acc = 100. * correct / total
         
-        print(f"Epoch {epoch+1} | Train Loss: {train_loss/len(train_loader):.4f} | Train Acc: {train_acc:.2f}% | Val Loss: {val_loss/len(val_loader):.4f} | Val Acc: {val_acc:.2f}%")
+        print(f"Epoch {epoch+1} | LR: {current_lr:.8f} | Train Loss: {train_loss/len(train_loader):.4f} | Train Acc: {train_acc:.2f}% | Val Loss: {val_loss/len(val_loader):.4f} | Val Acc: {val_acc:.2f}%")
         
         wandb.log({
             'epoch': epoch + 1,
+            'lr': current_lr,
             'train_loss': train_loss / len(train_loader),
             'train_acc': train_acc,
             'val_loss': val_loss / len(val_loader),
             'val_acc': val_acc,
             'noise_scale': noise_scale
         })
+
+        if scheduler is not None:
+            scheduler.step()
         
     wandb.finish()
     

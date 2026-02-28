@@ -77,15 +77,19 @@ class AreaSparseAttention(nn.Module):
         # tensor_2d: [B, Hh, C, H, W]
         B, Hh, C, H, W = tensor_2d.shape
         area = self.area_size
-        if H % area != 0 or W % area != 0:
-            raise ValueError(f"H ({H}) and W ({W}) must be divisible by area_size ({area}).")
+        pad_h = (area - (H % area)) % area
+        pad_w = (area - (W % area)) % area
+        if pad_h > 0 or pad_w > 0:
+            tensor_2d = F.pad(tensor_2d, (0, pad_w, 0, pad_h))
+            H = H + pad_h
+            W = W + pad_w
 
         h_area = H // area
         w_area = W // area
         tensor_2d = tensor_2d.view(B, Hh, C, h_area, area, w_area, area)
         pooled = tensor_2d.mean(dim=(4, 6))  # [B, Hh, C, h_area, w_area]
         pooled = pooled.view(B, Hh, C, h_area * w_area)
-        return pooled, h_area, w_area
+        return pooled, h_area, w_area, pad_h, pad_w
 
     def forward(self, x):
         # x: [B, N, C]
@@ -100,9 +104,9 @@ class AreaSparseAttention(nn.Module):
         k2d = k.transpose(-2, -1).reshape(B, self.num_heads, self.head_dim, H, W)
         v2d = v.transpose(-2, -1).reshape(B, self.num_heads, self.head_dim, H, W)
 
-        q_area, h_area, w_area = self._area_pool(q2d)  # [B, heads, d, A]
-        k_area, _, _ = self._area_pool(k2d)
-        v_area, _, _ = self._area_pool(v2d)
+        q_area, h_area, w_area, pad_h, pad_w = self._area_pool(q2d)  # [B, heads, d, A]
+        k_area, _, _, _, _ = self._area_pool(k2d)
+        v_area, _, _, _, _ = self._area_pool(v2d)
 
         q_area = q_area.transpose(-2, -1)  # [B, heads, A, d]
         k_area = k_area.transpose(-2, -1)
@@ -116,6 +120,8 @@ class AreaSparseAttention(nn.Module):
         out_area = out_area.transpose(-2, -1).reshape(B, self.num_heads, self.head_dim, h_area, w_area)
 
         out = out_area.repeat_interleave(self.area_size, dim=3).repeat_interleave(self.area_size, dim=4)
+        if pad_h > 0 or pad_w > 0:
+            out = out[:, :, :, :H + pad_h, :W + pad_w]
         out = out[:, :, :, :H, :W]
         out = out.reshape(B, self.num_heads, self.head_dim, N).transpose(-2, -1)
         out = out.reshape(B, N, C)
