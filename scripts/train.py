@@ -26,6 +26,7 @@ def get_dummy_dataloader(batch_size, image_size, num_classes, num_samples=100):
 def train(config_path):
     config = load_config(config_path)
     scheduler_cfg = config['training'].get('scheduler', {'type': 'none'})
+    early_stopping_cfg = config['training'].get('early_stopping', {'enabled': False})
     
     # Initialize wandb
     wandb.init(project=config['logging']['project'], name=config['logging']['run_name'], config=config)
@@ -144,6 +145,11 @@ def train(config_path):
         
     epochs = config['training']['epochs']
     noise_anneal_epochs = config['training']['noise_anneal_epochs']
+    early_stopping_enabled = early_stopping_cfg.get('enabled', False)
+    early_stopping_patience = early_stopping_cfg.get('patience', 5)
+    early_stopping_min_delta = early_stopping_cfg.get('min_delta', 0.0)
+    best_val_acc = float('-inf')
+    no_improvement_epochs = 0
     
     print("Starting training loop...")
     for epoch in range(epochs):
@@ -211,6 +217,21 @@ def train(config_path):
             'val_acc': val_acc,
             'noise_scale': noise_scale
         })
+
+        if early_stopping_enabled:
+            if val_acc > best_val_acc + early_stopping_min_delta:
+                best_val_acc = val_acc
+                no_improvement_epochs = 0
+            else:
+                no_improvement_epochs += 1
+
+            if no_improvement_epochs >= early_stopping_patience:
+                print(
+                    f"Early stopping triggered at epoch {epoch + 1}. "
+                    f"Best val_acc: {best_val_acc:.2f}% | "
+                    f"No improvement for {no_improvement_epochs} epoch(s)."
+                )
+                break
 
         if scheduler is not None:
             scheduler.step()
